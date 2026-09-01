@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff — Add Items</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 16px; background: #f7f7f7; }
+  h1 { text-align: center; }
+  #login { max-width: 300px; margin: 60px auto; text-align: center; }
+  #login input { width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px; }
+  .btn { padding: 10px 16px; font-size: 16px; border: none; border-radius: 6px; background: #2563eb; color: white; cursor: pointer; }
+  .btn.secondary { background: #999; }
+  .btn.danger { background: #dc2626; }
+  #app { display: none; max-width: 480px; margin: 0 auto; }
+  .capture-box { background: white; padding: 16px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+  .capture-box img { max-width: 100%; border-radius: 6px; margin: 10px 0; }
+  .price-display { font-size: 32px; font-weight: bold; margin: 10px 0; }
+  .item-row { background: white; padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  .item-row img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
+  .item-row .num { font-size: 12px; color: #888; width: 40px; }
+  .item-row input { width: 70px; padding: 6px; font-size: 14px; }
+  .item-row .spacer { flex: 1; }
+  #status { text-align: center; color: #555; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>Staff Login</h1>
+  <input type="password" id="password" placeholder="Password">
+  <button class="btn" onclick="doLogin()">Log In</button>
+  <p id="loginError" style="color:red;"></p>
+</div>
+
+<div id="app">
+  <h1>Add Item</h1>
+  <div class="capture-box">
+    <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none;">
+    <button class="btn" onclick="document.getElementById('photoInput').click()">📷 Take Photo</button>
+    <div id="preview"></div>
+    <button class="btn" id="speakBtn" style="display:none;" onclick="startListening()">🎤 Speak Price</button>
+    <div id="priceConfirm" style="display:none;">
+      <div class="price-display" id="priceValue"></div>
+      <button class="btn" onclick="confirmSave()">✅ Confirm & Save</button>
+      <button class="btn secondary" onclick="retryPrice()">🔁 Try Again</button>
+    </div>
+  </div>
+  <div id="status"></div>
+  <h1>Current Items</h1>
+  <div id="itemList"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient('PASTE_YOUR_PROJECT_URL_HERE', 'PASTE_YOUR_PUBLISHABLE_KEY_HERE');
+  let staffToken = localStorage.getItem('staffToken');
+  let capturedImage = null;
+  let spokenPrice = null;
+
+  if (staffToken) showApp();
+
+  async function doLogin() {
+    const password = document.getElementById('password').value;
+    const res = await fetch('/.netlify/functions/login', { method: 'POST', body: JSON.stringify({ password }) });
+    if (res.ok) {
+      const data = await res.json();
+      staffToken = data.token;
+      localStorage.setItem('staffToken', staffToken);
+      showApp();
+    } else {
+      document.getElementById('loginError').textContent = 'Wrong password.';
+    }
+  }
+
+  function showApp() {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadItems();
+  }
+
+  document.getElementById('photoInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      capturedImage = reader.result;
+      document.getElementById('preview').innerHTML = `<img src="${capturedImage}">`;
+      document.getElementById('speakBtn').style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function startListening() {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      const manual = prompt('Voice input not supported here — enter price:');
+      if (manual) showPriceConfirm(parseFloat(manual));
+      return;
+    }
+    const recognition = new Recognition();
+    recognition.lang = 'en-AU';
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      const num = parseFloat(text.replace(/[^0-9.]/g, ''));
+      if (!isNaN(num)) showPriceConfirm(num);
+      else alert(`Didn't catch a number ("${text}") — try again.`);
+    };
+    recognition.onerror = () => alert('Could not hear that — try again.');
+    recognition.start();
+  }
+
+  function showPriceConfirm(num) {
+    spokenPrice = num;
+    document.getElementById('priceValue').textContent = `$${num.toFixed(2)}`;
+    document.getElementById('priceConfirm').style.display = 'block';
+  }
+
+  function retryPrice() {
+    document.getElementById('priceConfirm').style.display = 'none';
+    startListening();
+  }
+
+  async function confirmSave() {
+    document.getElementById('status').textContent = 'Saving…';
+    const res = await fetch('/.netlify/functions/add-item', {
+      method: 'POST',
+      body: JSON.stringify({ token: staffToken, price: spokenPrice, imageBase64: capturedImage })
+    });
+    if (res.ok) {
+      document.getElementById('status').textContent = 'Saved!';
+      resetCapture();
+      loadItems();
+    } else {
+      const err = await res.json();
+      document.getElementById('status').textContent = 'Error: ' + err.error;
+    }
+  }
+
+  function resetCapture() {
+    capturedImage = null;
+    spokenPrice = null;
+    document.getElementById('preview').innerHTML = '';
+    document.getElementById('speakBtn').style.display = 'none';
+    document.getElementById('priceConfirm').style.display = 'none';
+    document.getElementById('photoInput').value = '';
+  }
+
+  async function loadItems() {
+    const { data, error } = await supabase.from('items').select('*').eq('status', 'active').order('number', { ascending: true });
+    const list = document.getElementById('itemList');
+    list.innerHTML = '';
+    if (error || !data) return;
+    for (const item of data) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<img src="${item.image_url}">
+        <div class="num">#${String(item.number).padStart(3, '0')}</div>
+        <input type="number" step="0.01" value="${item.price}" onchange="updatePrice(${item.number}, this.value)">
+        <div class="spacer"></div>
+        <button class="btn danger" onclick="deleteItem(${item.number})">Sold</button>`;
+      list.appendChild(row);
+    }
+  }
+
+  async function updatePrice(number, price) {
+    await fetch('/.netlify/functions/update-item', {
+      method: 'POST',
+      body: JSON.stringify({ token: staffToken, number, price: parseFloat(price), action: 'update-price' })
+    });
+  }
+
+  async function deleteItem(number) {
+    if (!confirm(`Mark #${String(number).padStart(3, '0')} as sold and remove it?`)) return;
+    await fetch('/.netlify/functions/update-item', {
+      method: 'POST',
+      body: JSON.stringify({ token: staffToken, number, action: 'delete' })
+    });
+    loadItems();
+  }
+</script>
+</body>
+</html>
