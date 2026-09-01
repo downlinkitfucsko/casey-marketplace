@@ -93,9 +93,14 @@
 
   function startListening() {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-      const manual = prompt('Voice input not supported here — enter price:');
-      if (manual) showPriceConfirm(parseFloat(manual));
+        if (!Recognition) {
+      const manual = prompt('Enter price:');
+      if (manual) {
+        const cleaned = manual.replace(/[^0-9.]/g, '');
+        const num = parseFloat(cleaned);
+        if (!isNaN(num)) showPriceConfirm(num);
+        else alert("Didn't catch a valid number — try again.");
+      }
       return;
     }
     const recognition = new Recognition();
@@ -156,9 +161,9 @@
       row.className = 'item-row';
       row.innerHTML = `<img src="${item.image_url}">
         <div class="num">#${String(item.number).padStart(3, '0')}</div>
-        <input type="number" step="0.01" value="${item.price}" onchange="updatePrice(${item.number}, this.value)">
+                <span style="font-weight:bold;">$</span><input type="number" step="0.01" value="${item.price}" onchange="updatePrice(${item.number}, this.value)">
         <div class="spacer"></div>
-        <button class="btn danger" onclick="deleteItem(${item.number})">Sold</button>`;
+        <button class="btn danger" onclick="deleteItem(${item.number})">Mark as Sold</button>`;
       list.appendChild(row);
     }
   }
