@@ -24,7 +24,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const supabase = window.supabase.createClient('https://pmdhbhzpjwicehlmztzf.supabase.co/rest/v1/', 'sb_secret_5LPgYhH0NahUbGFY6Qj_Ng_UUXBscoy');
+  const supabase = window.supabase.createClient('https://pmdhbhzpjwicehlmztzf.supabase.co/rest/v1/', 'sb_publishable_TYufdyQwQJJ99tm0krF99Q_OrlKG9EN');
 
   async function loadItems() {
     const { data, error } = await supabase.from('items').select('*').eq('status', 'active').order('number', { ascending: true });
