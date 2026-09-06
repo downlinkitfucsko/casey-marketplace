@@ -54,9 +54,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const sb = window.supabase.createClient('https://pmdhbhzpjwicehlmztzf.supabase.co', 'sb_publishable_xtjKbEom09iIdKPZlsu1DA_DlNMoHwV');
-  let staffToken = localStorage.getItem('staffToken');
+    let staffToken = localStorage.getItem('staffToken');
   let capturedImage = null;
   let spokenPrice = null;
+  let autoConfirmTimer = null;
+  let micTimeoutTimer = null;
+  let currentRecognition = null;
   const NUM_WORDS = {zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90};
 
   function wordsToNumber(text) {
@@ -108,9 +111,9 @@
     reader.readAsDataURL(file);
   });
 
-  function startListening() {
+    function startListening() {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Recognition) {
+    if (!Recognition) {
       const manual = prompt('Enter price:');
       if (manual) {
         const cleaned = manual.replace(/[^0-9.]/g, '');
@@ -121,36 +124,50 @@
       return;
     }
     const recognition = new Recognition();
+    currentRecognition = recognition;
     recognition.lang = 'en-AU';
-        recognition.onresult = (event) => {
+    recognition.onresult = (event) => {
+      clearMicTimeout();
       const text = event.results[0][0].transcript;
       const num = parsePrice(text);
       if (num !== null && !isNaN(num)) showPriceConfirm(num);
       else alert(`Didn't catch a number ("${text}") — try again.`);
     };
-    recognition.onerror = () => alert('Could not hear that — try again.');
+    recognition.onerror = () => { clearMicTimeout(); alert('Could not hear that — try again.'); };
+    recognition.onend = () => { clearMicTimeout(); };
     recognition.start();
+    micTimeoutTimer = setTimeout(() => {
+      if (currentRecognition) currentRecognition.stop();
+    }, 10000);
   }
 
-  function showPriceConfirm(num) {
+  function clearMicTimeout() {
+    if (micTimeoutTimer) { clearTimeout(micTimeoutTimer); micTimeoutTimer = null; }
+  }
+
+    function showPriceConfirm(num) {
     spokenPrice = num;
     document.getElementById('priceValue').textContent = `$${num.toFixed(2)}`;
     document.getElementById('priceConfirm').style.display = 'block';
+    autoConfirmTimer = setTimeout(() => { confirmSave(); }, 3000);
   }
 
   function retryPrice() {
+    if (autoConfirmTimer) { clearTimeout(autoConfirmTimer); autoConfirmTimer = null; }
     document.getElementById('priceConfirm').style.display = 'none';
     startListening();
   }
 
-  async function confirmSave() {
+    async function confirmSave() {
+    if (autoConfirmTimer) { clearTimeout(autoConfirmTimer); autoConfirmTimer = null; }
     document.getElementById('status').textContent = 'Saving…';
     const res = await fetch('/.netlify/functions/add-item', {
       method: 'POST',
       body: JSON.stringify({ token: staffToken, price: spokenPrice, imageBase64: capturedImage })
     });
     if (res.ok) {
-      document.getElementById('status').textContent = 'Saved!';
+      const saved = await res.json();
+      document.getElementById('status').textContent = `Saved as item #${String(saved.number).padStart(3, '0')}`;
       resetCapture();
       loadItems();
     } else {
