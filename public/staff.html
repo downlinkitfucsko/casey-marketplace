@@ -57,7 +57,24 @@
   let staffToken = localStorage.getItem('staffToken');
   let capturedImage = null;
   let spokenPrice = null;
+  const NUM_WORDS = {zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90};
 
+  function wordsToNumber(text) {
+    const words = text.toLowerCase().replace(/[^a-z0-9\s.]/g, ' ').split(/\s+/);
+    let total = 0, found = false;
+    for (const w of words) {
+      if (NUM_WORDS.hasOwnProperty(w)) { total += NUM_WORDS[w]; found = true; }
+      else if (w === 'hundred') { total *= 100; found = true; }
+      else if (/^\d+(\.\d+)?$/.test(w)) { total += parseFloat(w); found = true; }
+    }
+    return found ? total : null;
+  }
+
+  function parsePrice(text) {
+    const digitMatch = text.match(/\d+(\.\d+)?/);
+    if (digitMatch) return parseFloat(digitMatch[0]);
+    return wordsToNumber(text);
+  }
   if (staffToken) showApp();
 
   async function doLogin() {
