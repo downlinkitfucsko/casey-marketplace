@@ -137,9 +137,9 @@
     recognition.onerror = () => { clearMicTimeout(); alert('Could not hear that — try again.'); };
     recognition.onend = () => { clearMicTimeout(); };
     recognition.start();
-    micTimeoutTimer = setTimeout(() => {
+        micTimeoutTimer = setTimeout(() => {
       if (currentRecognition) currentRecognition.stop();
-    }, 10000);
+    }, 3000);
   }
 
   function clearMicTimeout() {
