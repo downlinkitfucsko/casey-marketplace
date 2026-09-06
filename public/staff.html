@@ -122,10 +122,10 @@
     }
     const recognition = new Recognition();
     recognition.lang = 'en-AU';
-    recognition.onresult = (event) => {
+        recognition.onresult = (event) => {
       const text = event.results[0][0].transcript;
-      const num = parseFloat(text.replace(/[^0-9.]/g, ''));
-      if (!isNaN(num)) showPriceConfirm(num);
+      const num = parsePrice(text);
+      if (num !== null && !isNaN(num)) showPriceConfirm(num);
       else alert(`Didn't catch a number ("${text}") — try again.`);
     };
     recognition.onerror = () => alert('Could not hear that — try again.');
